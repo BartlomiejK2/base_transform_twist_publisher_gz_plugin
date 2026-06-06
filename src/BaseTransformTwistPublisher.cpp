@@ -24,7 +24,7 @@ namespace gazebo_plugins
     node_ = std::make_shared<rclcpp::Node>("base_pose_twist_publisher");
 
     transformPublisher_ = node_->create_publisher<geometry_msgs::msg::TransformStamped>(
-      "base_pose", rclcpp::QoS(1).best_effort().keep_last(1));
+      "base_transfrom", rclcpp::QoS(1).best_effort().keep_last(1));
 
     twistPublisher_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>(
       "base_twist", rclcpp::QoS(1).best_effort().keep_last(1));
