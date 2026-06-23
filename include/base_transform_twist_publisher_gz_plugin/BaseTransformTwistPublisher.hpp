@@ -57,7 +57,12 @@ namespace gazebo_plugins
       gz::sim::Entity robotEntity_{gz::sim::kNullEntity};
 
       std::string baseFrameName_;
-      std::string referenceFrameName_{"world"};
+      std::string referenceFrameName_{"world"}; 
+
+      std::chrono::steady_clock::duration lastPublishTime_{0};
+
+      // Default duration 10ms
+      std::chrono::steady_clock::duration publishDuration_ = std::chrono::milliseconds(10); 
   };
 } // namespace gazebo_plugins
 #endif

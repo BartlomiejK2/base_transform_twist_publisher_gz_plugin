@@ -23,6 +23,9 @@ namespace gazebo_plugins
 
     node_ = std::make_shared<rclcpp::Node>("base_pose_twist_publisher");
 
+    // Set use_sim_time
+    node_->set_parameter(rclcpp::Parameter("use_sim_time", true));
+
     transformPublisher_ = node_->create_publisher<geometry_msgs::msg::TransformStamped>(
       "/base_transform", rclcpp::QoS(1).best_effort().keep_last(1));
 
@@ -41,7 +44,7 @@ namespace gazebo_plugins
     {
       std::string errorMessage = "No <base_frame_name> defined!";
       RCLCPP_ERROR(node_->get_logger(), "%s", errorMessage.c_str());
-      throw std::runtime_error(errorMessage );
+      throw std::runtime_error(errorMessage);
     }
 
     const std::string maybeReferenceName = _sdf->Get<std::string>("reference_frame_name");
@@ -52,6 +55,18 @@ namespace gazebo_plugins
     else
     {
       RCLCPP_WARN(node_->get_logger(), "No <reference_frame_name> defined, using \"%s\"!", referenceFrameName_.c_str());
+    }
+
+    const auto publishFrequencyString = _sdf->Get<std::string>("max_publish_frequency");
+    if(!publishFrequencyString.empty())
+    {
+      const double publishFrequency = std::stod(publishFrequencyString);
+      publishDuration_ = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+        std::chrono::duration<double>(1.0 / publishFrequency));
+    }
+    else
+    {
+      RCLCPP_WARN(node_->get_logger(), "No <max_publish_frequency> defined, using 100Hz");
     }
 
     _ecm.Each<gz::sim::components::Link, gz::sim::components::Name>([&](
@@ -70,7 +85,7 @@ namespace gazebo_plugins
     if(baseEntity_ == gz::sim::kNullEntity)
     {
       std::string errorMessage = "Could not find " + baseFrameName_ + " frame!";
-      RCLCPP_ERROR(node_->get_logger(), "%s", errorMessage);
+      RCLCPP_ERROR(node_->get_logger(), "%s", errorMessage.c_str());
       throw std::runtime_error(errorMessage);
     }
 
@@ -82,7 +97,7 @@ namespace gazebo_plugins
     if(robotEntity_ == gz::sim::kNullEntity)
     {
       std::string errorMessage = "Could not find robot entity!";
-      RCLCPP_ERROR(node_->get_logger(), "%s", errorMessage);
+      RCLCPP_ERROR(node_->get_logger(), "%s", errorMessage.c_str());
       throw std::runtime_error(errorMessage);
     }
 
@@ -91,19 +106,28 @@ namespace gazebo_plugins
     if(world != gz::sim::kNullEntity)
     {
       std::string errorMessage = "Given base frame is not true base frame!";
-      RCLCPP_ERROR(node_->get_logger(), "%s", errorMessage);
+      RCLCPP_ERROR(node_->get_logger(), "%s", errorMessage.c_str());
       throw std::runtime_error(errorMessage);
     }
 
     // Turn on velocity checker for this link
     gz::sim::Link gzLink_ = gz::sim::Link(baseEntity_);
     gzLink_.EnableVelocityChecks(_ecm);
+    
   }
 
   void BaseTransformTwistPublisher::PostUpdate(
     const gz::sim::UpdateInfo &_info,
     const gz::sim::EntityComponentManager &_ecm)
   {
+    if((_info.simTime - lastPublishTime_) < publishDuration_)
+    {
+      // Simulation to fast
+      return;
+    }
+
+    lastPublishTime_ = _info.simTime;
+
     const auto poseComp = _ecm.Component<gz::sim::components::Pose>(robotEntity_);
 
     const auto linVelComp = _ecm.Component<gz::sim::components::LinearVelocity>(
@@ -115,7 +139,7 @@ namespace gazebo_plugins
     if(!poseComp || !linVelComp || !angVelComp)
     {
       std::string errorMessage = "Cannot get pose, linear or angular velocity of base!";
-      RCLCPP_ERROR(node_->get_logger(), "%s", errorMessage);
+      RCLCPP_ERROR(node_->get_logger(), "%s", errorMessage.c_str());
       return;
     }
 
