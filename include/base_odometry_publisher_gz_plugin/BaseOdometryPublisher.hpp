@@ -16,8 +16,8 @@
  * Authors: Bartłomiej Krajewski (https://github.com/BartlomiejK2)
  */
 
-#ifndef __BASE_TRANSFORM_TWIST_PUBLISHER_GZ_PLUGIN__
-#define __BASE_TRANSFORM_TWIST_PUBLISHER_GZ_PLUGIN__
+#ifndef __BASE_ODOMETRY_PUBLISHER_GZ_PLUGIN__
+#define __BASE_ODOMETRY_PUBLISHER_GZ_PLUGIN__
 
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
@@ -28,11 +28,11 @@
 #include <tf2_ros/transform_broadcaster.h>
 
 #include <geometry_msgs/msg/transform_stamped.hpp>
-#include <geometry_msgs/msg/twist_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 
 namespace gazebo_plugins
 {
-  class BaseTransformTwistPublisher:
+  class BaseOdometryPublisher:
     public gz::sim::System,
     public gz::sim::ISystemConfigure,
     public gz::sim::ISystemPostUpdate
@@ -49,8 +49,7 @@ namespace gazebo_plugins
     private:
       rclcpp::Node::SharedPtr node_;
 
-      rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr transformPublisher_;
-      rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twistPublisher_;
+      rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometryPublisher_;
       std::unique_ptr<tf2_ros::TransformBroadcaster> transformBroadcaster_;
 
       gz::sim::Entity baseEntity_{gz::sim::kNullEntity};

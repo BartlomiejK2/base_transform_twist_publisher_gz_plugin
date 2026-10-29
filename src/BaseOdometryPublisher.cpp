@@ -1,4 +1,4 @@
-#include <base_transform_twist_publisher_gz_plugin/BaseTransformTwistPublisher.hpp>
+#include <base_odometry_publisher_gz_plugin/BaseOdometryPublisher.hpp>
 
 #include <gz/plugin/Register.hh>
 
@@ -12,7 +12,7 @@
 
 namespace gazebo_plugins
 {
-  void BaseTransformTwistPublisher::Configure(const gz::sim::Entity&,
+  void BaseOdometryPublisher::Configure(const gz::sim::Entity&,
     const std::shared_ptr<const sdf::Element>& _sdf,
     gz::sim::EntityComponentManager& _ecm, gz::sim::EventManager&)
   {
@@ -21,16 +21,13 @@ namespace gazebo_plugins
       rclcpp::init(0, nullptr);
     }
 
-    node_ = std::make_shared<rclcpp::Node>("base_pose_twist_publisher");
+    node_ = std::make_shared<rclcpp::Node>("base_odometry_publisher");
 
     // Set use_sim_time
     node_->set_parameter(rclcpp::Parameter("use_sim_time", true));
 
-    transformPublisher_ = node_->create_publisher<geometry_msgs::msg::TransformStamped>(
-      "/base_transform", rclcpp::QoS(1).best_effort().keep_last(1));
-
-    twistPublisher_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>(
-      "/base_twist", rclcpp::QoS(1).best_effort().keep_last(1));
+    odometryPublisher_ = node_->create_publisher<nav_msgs::msg::Odometry>(
+      "/base_odometry", rclcpp::QoS(1).best_effort().keep_last(1));
 
     transformBroadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*node_);
 
@@ -116,7 +113,7 @@ namespace gazebo_plugins
     
   }
 
-  void BaseTransformTwistPublisher::PostUpdate(
+  void BaseOdometryPublisher::PostUpdate(
     const gz::sim::UpdateInfo &_info,
     const gz::sim::EntityComponentManager &_ecm)
   {
@@ -146,45 +143,50 @@ namespace gazebo_plugins
     const auto stamp = rclcpp::Time(std::chrono::duration_cast<std::chrono::nanoseconds>(
       _info.simTime).count());
 
-    geometry_msgs::msg::TransformStamped baseTransform;
-    baseTransform.header.stamp = stamp;
-    baseTransform.header.frame_id = referenceFrameName_;
-    baseTransform.child_frame_id = baseFrameName_;
+    // Pose is expressed in reference frame, twist in base frame (nav_msgs/Odometry convention)
+    nav_msgs::msg::Odometry baseOdometry;
+    baseOdometry.header.stamp = stamp;
+    baseOdometry.header.frame_id = referenceFrameName_;
+    baseOdometry.child_frame_id = baseFrameName_;
 
     const auto& pose = poseComp->Data();
 
-    baseTransform.transform.translation.x = pose.Pos().X();
-    baseTransform.transform.translation.y = pose.Pos().Y();
-    baseTransform.transform.translation.z = pose.Pos().Z();
+    baseOdometry.pose.pose.position.x = pose.Pos().X();
+    baseOdometry.pose.pose.position.y = pose.Pos().Y();
+    baseOdometry.pose.pose.position.z = pose.Pos().Z();
 
-    baseTransform.transform.rotation.x = pose.Rot().X();
-    baseTransform.transform.rotation.y = pose.Rot().Y();
-    baseTransform.transform.rotation.z = pose.Rot().Z();
-    baseTransform.transform.rotation.w = pose.Rot().W();
-
-    geometry_msgs::msg::TwistStamped baseTwist;
-    baseTwist.header.stamp = stamp;
-    baseTwist.header.frame_id = baseFrameName_;
+    baseOdometry.pose.pose.orientation.x = pose.Rot().X();
+    baseOdometry.pose.pose.orientation.y = pose.Rot().Y();
+    baseOdometry.pose.pose.orientation.z = pose.Rot().Z();
+    baseOdometry.pose.pose.orientation.w = pose.Rot().W();
 
     const auto& lin = linVelComp->Data();
     const auto& ang = angVelComp->Data();
 
-    baseTwist.twist.linear.x = lin.X();
-    baseTwist.twist.linear.y = lin.Y();
-    baseTwist.twist.linear.z = lin.Z();
+    baseOdometry.twist.twist.linear.x = lin.X();
+    baseOdometry.twist.twist.linear.y = lin.Y();
+    baseOdometry.twist.twist.linear.z = lin.Z();
 
-    baseTwist.twist.angular.x = ang.X();
-    baseTwist.twist.angular.y = ang.Y();
-    baseTwist.twist.angular.z = ang.Z();
+    baseOdometry.twist.twist.angular.x = ang.X();
+    baseOdometry.twist.twist.angular.y = ang.Y();
+    baseOdometry.twist.twist.angular.z = ang.Z();
 
-    transformPublisher_->publish(baseTransform);
-    twistPublisher_->publish(baseTwist);
+    geometry_msgs::msg::TransformStamped baseTransform;
+    baseTransform.header = baseOdometry.header;
+    baseTransform.child_frame_id = baseOdometry.child_frame_id;
+
+    baseTransform.transform.translation.x = baseOdometry.pose.pose.position.x;
+    baseTransform.transform.translation.y = baseOdometry.pose.pose.position.y;
+    baseTransform.transform.translation.z = baseOdometry.pose.pose.position.z;
+    baseTransform.transform.rotation = baseOdometry.pose.pose.orientation;
+
+    odometryPublisher_->publish(baseOdometry);
     transformBroadcaster_->sendTransform(baseTransform);
   }
 } // namespace gazebo_plugins
 
 IGNITION_ADD_PLUGIN(
-    gazebo_plugins::BaseTransformTwistPublisher,
+    gazebo_plugins::BaseOdometryPublisher,
     ignition::gazebo::System,
-    gazebo_plugins::BaseTransformTwistPublisher::ISystemConfigure,
-    gazebo_plugins::BaseTransformTwistPublisher::ISystemPostUpdate)
+    gazebo_plugins::BaseOdometryPublisher::ISystemConfigure,
+    gazebo_plugins::BaseOdometryPublisher::ISystemPostUpdate)
