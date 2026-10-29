@@ -27,7 +27,7 @@ namespace gazebo_plugins
     node_->set_parameter(rclcpp::Parameter("use_sim_time", true));
 
     odometryPublisher_ = node_->create_publisher<nav_msgs::msg::Odometry>(
-      "/base_odometry", rclcpp::QoS(1).best_effort().keep_last(1));
+      "/odom", rclcpp::QoS(1).best_effort().keep_last(1));
 
     transformBroadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*node_);
 
